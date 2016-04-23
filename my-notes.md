@@ -8,6 +8,10 @@ Prepare container
   Prepare network
   Run application
 
+
+
+Docker is always running as root! This is so it has privilege to do the things it needs to do. Latest version does improve this a bit.
+
 Docker Commands
 ---------------
 
@@ -139,6 +143,8 @@ Create an image from existing container
 ## Creating a Dockerfile
 Dockerfiles are written in Go. The default filename is "Dockerfile".
 Instructions (directives) are written in ALL CAPS.
+https://docs.docker.com/engine/reference/builder/
+
 Create a directory (e.g. my_busybox) then change to that directory. Create a file named `Dockerfile` with the following contents:
 
 FROM busybox:latest  # create an image based on this image
@@ -174,7 +180,8 @@ Set working direction (current directory from that point onwards)
 
 
 
-
+CMD ["-c", "cat /AnotherUnecessaryFile.txt"]
+ENTRYPOINT ["sh"]
 
 
 ### ENTRYPOINT vs COMMAND
@@ -196,7 +203,11 @@ ENTRYPOINT ["sh"]
 The command (CMD) is appended to the entry point. Both are specifying the meta data for the image (so order of declaring CMD and ENTRYPOINT does not matter).
 
 Both CMD and ENTRYPOINT can be overwritten with the docker command.
-$ docker run -ti <image> <command>
+$ docker run --entrypoint <entrypoint> <image> <command>
+e.g. $ docker run --entrypoint /bin/bash my_busybox:v4 -c "echo Nothing!"
+
+
+entrypoint is always executed, and combined with the command. Command can be easily overridden by specifying at end of `docker run` command.
 
 
 ## Storing Images in Private Registry
@@ -209,7 +220,7 @@ $ docker run -ti <image> <command>
 
 ## Use the registry API
 
-(You can use a Docker image to create a registry)
+(You can use a Docker image to start a container that runs a Docker registry)
 
 $ curl -sL registry.training.local/v2/ | jq .
 	check the registry is running (returns {})
@@ -217,14 +228,114 @@ $ curl -sL registry.training.local/v2/ | jq .
 $ curl -sL registry.training.local/v2/_catalog | jq .
 	get list of images
 
-*** How to get JSON that described the container (showed ports, etc)
+curl -sL registry.training.local/v2/{image_name}/tags/list | jq .
+Get all the tags for an image repository in the registry.
+
+$ docker login
+$ docker logout
+Set credentials for logging in to a Docker registry.
 
 
 
+### Mount local directory to appear inside container
+
+$ docker run -v <volume>
+
+$ mkdir my_volume
+$ echo "Outside file!" > my_volume/Outside.txt
+$ docker run -v ${PWD}/my_volume/:/my_volume -ti busybox sh
+!!! Security risk.
+!!! Access is write/read by default.
+
+Put `ro` after container volume name to make access read-only, e.g.
+e.g. $ docker run -v ${PWD}/my_volume/:/my_volume:ro -ti busybox sh
+
+Can map a single file (and give it a different name inside the container)
+$ docker run -v ${PWD}/my_volume/Outside.txt:/my_volume/Inside.txt -ti busybox sh
 
 
 
+$ docker network ls
 
-Docker is always running as root! This is so it has privilege to do the things it needs to do. Latest version does improve this a bit.
+Three pre-defined network drivers always exist:
+  null: no network
+  host: use network interface (hardware) of host, could clash if try to use a port that host is already using.
+  bridge: virtual network interface, container has an IP address separate from host.
+Bridge is the best option, and used by default
+
+$ docker network create training-network
+Create a network.
+
+Create a web app running on the training network:
+$ docker run -d -P --name web --net training-network training/webapp python app.py
+Create a bash terminal, also running on the training network:
+$ docker run -ti  --net training-network ubuntu bash
+Install some useful networking tools:
+$ apt-get install -y curl
+$ apt-get install -y dnsutils
+DNS lookup the web app container. It has a DNS entry under `web` because the container was created with that name.
+$ dig web
+Make a web request to the web server container:
+$ curl web:5000
+
+### Docker Client
+$ docker -H tcp://workstation-11.training.local:2375 ps -a
+Run docker client and connect to a different docker daemon.
+
+## Docker Compose
+Define how to run containers, how to connect them. Use yml file to do this.
+
+$ mkdir my_compose
+$ vim my_compose/docker-compose.yml
+
+--- Contents start ---
+version: "2"
+services:
+  web1:
+    image: training/webapp
+    networks:
+      - service_network 
+    command:
+      - "python"
+      - "app.py"
+  web2:
+    image: training/webapp
+    networks:
+      service_network:
+        aliases:
+          - web_two
+    command:
+      - "python"
+      - "app.py"
+  web3:
+    image: training/webapp
+    networks:
+      - service_network
+    command:
+      - "python"
+      - "app.py"
+networks:
+  service_network:
+--- Contents end ---
+
+Using `networks: service_network: aliases: - <alias>` allows you to set a DNS alias.
+
+$ docker-compose -f my_compose/docker-compose.yml up
+Create and start containers, using the specified yml file.
+
+CTRL-C to stop, then:
+$ docker-compose -f my_compose/docker-compose.yml down
+
+Run again, this time in background:
+$ docker-compose -f my_compose/docker-compose.yml up -d
+Find names of containers:
+$ docker ps
+$ docker exec mycompose_web1_1 ps
+
+Or to connect interactively:
+$ docker exec -ti mycompose_web1_1 bash
+# apt-get update
+# apt-get install -y curl
+# apt-get install -y dnsutils
 
 
