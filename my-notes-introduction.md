@@ -338,4 +338,6 @@ $ docker exec -ti mycompose_web1_1 bash
 # apt-get install -y curl
 # apt-get install -y dnsutils
 
-
+### Scaling using docker compose
+$ docker-compose -f my_compose/docker-compose.yml scale web1=5
+Scale the web1 service to have 5 instances.
