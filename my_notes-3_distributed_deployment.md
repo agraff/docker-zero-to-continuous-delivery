@@ -78,7 +78,7 @@ with:
     ports:
       - "4567"
 ```
-But now need a proxy / load balancer to route to the services running on random ports. See further below.
+But now need a proxy / load balancer to route to the services running on random ports. See notes about service discovery.
 
 
 Scale the service, by changing the build step for 3. Deploy.
@@ -93,7 +93,4 @@ docker-compose scale workstation-7=0
 docker-compose scale workstation-7=4
 ```
 
-
-### Service Discovery
-
-Use Consul, and register our web application as a service.
+Make sure that the service name in docker-compose.yml matches the service name used with docker-compose above (e.g. workstation-7).
